@@ -86,3 +86,46 @@ app.get("/analytics/fatigue", async (req, res) => {
   }
 });
 
+app.get("/analytics/optimal-session", async (req, res) => {
+  try {
+
+    const { subject } = req.query;
+
+    const result = await pool.query(
+      `SELECT
+       ROUND(AVG(EXTRACT(EPOCH FROM (end_time - start_time)) / 60))
+       AS optimal_session_minutes
+       FROM study_sessions
+       WHERE focus_rating >= 4
+       AND subject = $1
+       AND end_time IS NOT NULL`,
+      [subject]
+    );
+
+    res.json({
+      subject,
+      optimal_session_minutes: result.rows[0].optimal_session_minutes
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error fetching optimal session");
+  }
+});
+
+app.get("/sessions", async (req, res) => {
+  try {
+
+    const result = await pool.query(
+      `SELECT *
+       FROM study_sessions
+       ORDER BY start_time DESC`
+    );
+
+    res.json(result.rows);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error fetching sessions");
+  }
+});
