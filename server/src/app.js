@@ -47,50 +47,42 @@ app.post("/sessions/start", async (req, res) => {
 app.post("/sessions/end", async (req, res) => {
   try {
 
-    const { session_id } = req.body
+    const { session_id, fatigue_rating, focus_rating } = req.body;
 
     const result = await pool.query(
-      "UPDATE study_sessions SET end_time = NOW() WHERE id = $1 RETURNING *",
-      [session_id]
-    )
+      `UPDATE study_sessions
+       SET end_time = NOW(),
+           fatigue_rating = $1,
+           focus_rating = $2
+       WHERE id = $3
+       RETURNING *`,
+      [fatigue_rating, focus_rating, session_id]
+    );
 
-    const start = new Date(result.rows[0].start_time)
-    const end = new Date(result.rows[0].end_time)
-
-    const duration = Math.round((end - start) / 60000)
-
-    res.json({
-      id: result.rows[0].id,
-      duration_minutes: duration
-    })
+    res.json(result.rows[0]);
 
   } catch (err) {
-    console.error(err)
-    res.status(500).send("Error ending session")
+    console.error(err);
+    res.status(500).send("Error ending session");
   }
-})
+});
 
-app.get("/sessions/stats", async (req, res) => {
+app.get("/analytics/fatigue", async (req, res) => {
   try {
 
     const result = await pool.query(
-      `SELECT 
-       COUNT(*) AS total_sessions,
-       SUM(EXTRACT(EPOCH FROM (end_time - start_time))/60) AS total_minutes,
-       AVG(EXTRACT(EPOCH FROM (end_time - start_time))/60) AS avg_session_minutes
+      `SELECT ROUND(AVG(EXTRACT(EPOCH FROM (end_time - start_time)) / 60)) 
+       AS avg_fatigue_duration
        FROM study_sessions
-       WHERE end_time IS NOT NULL`
-    )
+       WHERE fatigue_rating >= 3
+       AND end_time IS NOT NULL`
+    );
 
-    
-  res.json({
-  total_sessions: parseInt(result.rows[0].total_sessions),
-  total_minutes: Math.round(result.rows[0].total_minutes),
-  avg_session_minutes: Math.round(result.rows[0].avg_session_minutes)
-})
+    res.json(result.rows[0]);
 
   } catch (err) {
-    console.error(err)
-    res.status(500).send("Error fetching stats")
+    console.error(err);
+    res.status(500).send("Error fetching fatigue analytics");
   }
-})
+});
+
