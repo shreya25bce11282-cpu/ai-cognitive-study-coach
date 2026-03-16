@@ -24,6 +24,12 @@ app.get("/test", (req, res) => {
   res.send("Backend working correctly");
 });
 
+app.get("/version", (req, res) => {
+  res.json({
+    app: "AI Cognitive Study Coach",
+    version: "1.0.0"
+  });
+});
 // Test database connection
 async function testDB() {
   try {
