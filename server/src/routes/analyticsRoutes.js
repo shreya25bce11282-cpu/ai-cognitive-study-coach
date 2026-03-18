@@ -6,7 +6,8 @@ import {
   getSubjectPerformance,
   getStudyPlan,
   getBurnoutRisk,
-  getBreakRecommendation
+  getBreakRecommendation,
+  predictSessionDuration
 } from "../controllers/analyticsController.js";
 
 const router = express.Router();
@@ -18,5 +19,6 @@ router.get("/analytics/subject-performance", getSubjectPerformance);
 router.get("/analytics/recommend-study-plan", getStudyPlan);
 router.get("/analytics/burnout-risk", getBurnoutRisk);
 router.get("/analytics/break-recommendation", getBreakRecommendation);
+router.get("/analytics/predict-session", predictSessionDuration);
 
 export default router;
