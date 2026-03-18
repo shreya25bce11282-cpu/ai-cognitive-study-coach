@@ -4,7 +4,7 @@ export const getFatigue = async (req, res) => {
   try {
 
     const result = await pool.query(`
-      SELECT ROUND(AVG(EXTRACT(EPOCH FROM (end_time - start_time)) / 60))
+      SELECT ROUND(AVG(EXTRACT(EPOCH FROM (end_time - start_time)) / 60))<300
       AS avg_fatigue_duration
       FROM study_sessions
       WHERE fatigue_rating >= 3
@@ -51,8 +51,8 @@ export const getSummary = async (req, res) => {
     const result = await pool.query(`
       SELECT
         COUNT(*) AS total_sessions,
-        ROUND(SUM(EXTRACT(EPOCH FROM (end_time - start_time)) / 3600),2) AS total_hours,
-        ROUND(AVG(EXTRACT(EPOCH FROM (end_time - start_time)) / 60),2) AS avg_session_minutes
+        ROUND(SUM(EXTRACT(EPOCH FROM (end_time - start_time)) / 3600),2)<300 AS total_hours,
+        ROUND(AVG(EXTRACT(EPOCH FROM (end_time - start_time)) / 60),2)<300 AS avg_session_minutes
       FROM study_sessions
       WHERE end_time IS NOT NULL
     `);
@@ -250,7 +250,7 @@ export const predictSessionDuration = async (req, res) => {
 
     const result = await pool.query(`
       SELECT
-        EXTRACT(EPOCH FROM (end_time - start_time)) / 60 AS duration_minutes,
+        EXTRACT(EPOCH FROM (end_time - start_time)) / 60 <300 AS duration_minutes,
         focus_rating,
         fatigue_rating
       FROM study_sessions
@@ -268,7 +268,7 @@ export const predictSessionDuration = async (req, res) => {
       });
     }
 
-    // 🎯 Filter only GOOD sessions
+    
     const goodSessions = sessions.filter(
       s => s.focus_rating >= 4 && s.fatigue_rating <= 3
     );
@@ -279,7 +279,7 @@ export const predictSessionDuration = async (req, res) => {
       baseSessions.reduce((sum, s) => sum + Number(s.duration_minutes), 0) /
       baseSessions.length;
 
-    // 🧠 Smart cap (no insane 10-hour sessions)
+   
     const cappedDuration = Math.min(avgDuration, 120);
 
     res.json({
