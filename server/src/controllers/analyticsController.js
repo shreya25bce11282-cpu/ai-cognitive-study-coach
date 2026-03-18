@@ -294,4 +294,41 @@ export const predictSessionDuration = async (req, res) => {
   }
 };
 
+export const getBestStudyTime = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        EXTRACT(HOUR FROM start_time) AS hour,
+        AVG(focus_rating) AS avg_focus,
+        AVG(fatigue_rating) AS avg_fatigue,
+        COUNT(*) as sessions
+      FROM study_sessions
+      WHERE end_time IS NOT NULL
+      AND EXTRACT(EPOCH FROM (end_time - start_time)) / 60 < 300
+      GROUP BY hour
+      ORDER BY avg_focus DESC, avg_fatigue ASC
+      LIMIT 1
+    `);
 
+    if (result.rows.length === 0) {
+      return res.json({
+        best_hour: null,
+        message: "Not enough data yet"
+      });
+    }
+
+    const best = result.rows[0];
+
+    res.json({
+      best_hour: `${best.hour}:00`,
+      avg_focus: Number(best.avg_focus).toFixed(2),
+      avg_fatigue: Number(best.avg_fatigue).toFixed(2),
+      sessions_analyzed: best.sessions,
+      insight: "This is when your brain performs best"
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error finding best study time");
+  }
+};
