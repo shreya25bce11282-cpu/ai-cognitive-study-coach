@@ -163,12 +163,18 @@ const fatigueTrend =
     let burnoutRisk = "LOW";
     let recommendation = "You're in a healthy study rhythm.";
 
-    if (avgDuration > 90 && avgFatigue >= 3 && avgFocus <= 3) {
+    if (
+      avgDuration > 90 &&
+      avgFatigue >= 3 &&
+      avgFocus <= 3 &&
+      fatigueTrend > 0
+      ) {
       burnoutRisk = "HIGH";
-      recommendation = "Take a 30 minute break and shorten future sessions.";
-    } else if (avgDuration > 60 && avgFatigue >= 3) {
+      recommendation = "Fatigue is increasing. Take a break immediately.";
+        }
+      else if (avgDuration > 60 && avgFatigue >= 3 && fatigueTrend >= 0) {
       burnoutRisk = "MEDIUM";
-      recommendation = "Consider shorter sessions or a quick break.";
+      recommendation = "Fatigue is building up. Consider shorter sessions.";
     }
 
     res.json({
