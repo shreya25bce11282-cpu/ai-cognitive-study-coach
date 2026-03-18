@@ -193,3 +193,54 @@ const fatigueTrend =
   }
 };
 
+export const getBreakRecommendation = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        EXTRACT(EPOCH FROM (end_time - start_time)) / 60 AS duration_minutes,
+        fatigue_rating,
+        focus_rating
+      FROM study_sessions
+      WHERE end_time IS NOT NULL
+      ORDER BY start_time DESC
+      LIMIT 3
+    `);
+
+    const sessions = result.rows;
+
+    if (sessions.length === 0) {
+      return res.json({
+        recommendation: "No data yet. Start studying first."
+      });
+    }
+
+    const avgDuration =
+      sessions.reduce((sum, s) => sum + Number(s.duration_minutes), 0) /
+      sessions.length;
+
+    const avgFatigue =
+      sessions.reduce((sum, s) => sum + (s.fatigue_rating || 0), 0) /
+      sessions.length;
+
+    let recommendation;
+
+    if (avgDuration > 90 || avgFatigue >= 4) {
+      recommendation = "Take a 30 min break now.";
+    } else if (avgDuration > 60 || avgFatigue >= 3) {
+      recommendation = "Take a 10–15 min break.";
+    } else {
+      recommendation = "You're good. Keep going!";
+    }
+
+    res.json({
+      avg_duration_minutes: Number(avgDuration.toFixed(2)),
+      avg_fatigue: Number(avgFatigue.toFixed(2)),
+      recommendation
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error generating break recommendation");
+  }
+};
+
