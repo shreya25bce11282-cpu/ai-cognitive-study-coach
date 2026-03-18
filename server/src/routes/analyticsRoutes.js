@@ -21,6 +21,6 @@ router.get("/analytics/recommend-study-plan", getStudyPlan);
 router.get("/analytics/burnout-risk", getBurnoutRisk);
 router.get("/analytics/break-recommendation", getBreakRecommendation);
 router.get("/analytics/predict-session", predictSessionDuration);
-router.get("/analytics/best-study-time", getBestStudyTime);
+router.get("/analytics/best-time", getBestStudyTime);
 
 export default router;

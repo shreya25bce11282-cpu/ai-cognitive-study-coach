@@ -318,7 +318,11 @@ export const getBestStudyTime = async (req, res) => {
     }
 
     const best = result.rows[0];
-
+    const hour = best.hour;
+    const label =
+      hour < 12 ? `${hour} AM` :
+      hour === 12 ? "12 PM" :
+      `${hour - 12} PM`;
     res.json({
       best_hour: `${best.hour}:00`,
       avg_focus: Number(best.avg_focus).toFixed(2),
