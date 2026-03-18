@@ -136,6 +136,11 @@ export const getBurnoutRisk = async (req, res) => {
 
     const sessions = result.rows;
 
+    const fatigueValues = sessions.map(s => Number(s.fatigue_rating));
+
+const fatigueTrend =
+  fatigueValues[fatigueValues.length - 1] - fatigueValues[0];
+
     if (sessions.length === 0) {
       return res.json({
         burnout_risk: "UNKNOWN",
@@ -180,3 +185,4 @@ export const getBurnoutRisk = async (req, res) => {
     res.status(500).send("Error analyzing burnout risk");
   }
 };
+
