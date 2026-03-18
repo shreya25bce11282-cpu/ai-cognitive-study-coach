@@ -225,9 +225,9 @@ export const getBreakRecommendation = async (req, res) => {
     let recommendation;
 
     if (avgDuration > 90 || avgFatigue >= 4) {
-      recommendation = "Take a 30 min break now.";
+      recommendation = "Take a 30 min break now. Go and touch some grass, comrade!";
     } else if (avgDuration > 60 || avgFatigue >= 3) {
-      recommendation = "Take a 10–15 min break.";
+      recommendation = "Take a 10–15 min break.Breath. Stretch. Hydrate.";
     } else {
       recommendation = "You're good. Keep going!";
     }
@@ -243,4 +243,55 @@ export const getBreakRecommendation = async (req, res) => {
     res.status(500).send("Error generating break recommendation");
   }
 };
+
+export const predictSessionDuration = async (req, res) => {
+  try {
+    const { subject } = req.query;
+
+    const result = await pool.query(`
+      SELECT
+        EXTRACT(EPOCH FROM (end_time - start_time)) / 60 AS duration_minutes,
+        focus_rating,
+        fatigue_rating
+      FROM study_sessions
+      WHERE subject = $1
+      AND end_time IS NOT NULL
+    `, [subject]);
+
+    const sessions = result.rows;
+
+    if (sessions.length === 0) {
+      return res.json({
+        subject,
+        predicted_duration: 45,
+        reason: "No past data, using default"
+      });
+    }
+
+    // 🎯 Filter only GOOD sessions
+    const goodSessions = sessions.filter(
+      s => s.focus_rating >= 4 && s.fatigue_rating <= 3
+    );
+
+    const baseSessions = goodSessions.length > 0 ? goodSessions : sessions;
+
+    const avgDuration =
+      baseSessions.reduce((sum, s) => sum + Number(s.duration_minutes), 0) /
+      baseSessions.length;
+
+    // 🧠 Smart cap (no insane 10-hour sessions)
+    const cappedDuration = Math.min(avgDuration, 120);
+
+    res.json({
+      subject,
+      predicted_duration: Number(cappedDuration.toFixed(0)),
+      based_on_sessions: baseSessions.length
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error predicting session duration");
+  }
+};
+
 
