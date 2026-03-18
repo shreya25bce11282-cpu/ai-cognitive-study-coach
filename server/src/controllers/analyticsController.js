@@ -13,11 +13,13 @@ export const getFatigue = async (req, res) => {
       AND (end_time - start_time) < INTERVAL '5 hours'
     `);
 
-    const value = result.rows[0].avg_fatigue_duration;
+    const value = result.rows[0]?.avg_fatigue_duration;
 
     res.json({
       avg_fatigue_duration: value ?? 0,
-      message: value ? "Calculated successfully" : "Not enough fatigue data"
+      message: value
+        ? "Fatigue duration calculated successfully"
+        : "Not enough fatigue data yet"
     });
 
   } catch (err) {
@@ -43,9 +45,14 @@ export const getOptimalSession = async (req, res) => {
       AND (end_time - start_time) < INTERVAL '5 hours'
     `, [subject]);
 
+    const value = result.rows[0]?.optimal_session_minutes;
+
     res.json({
       subject,
-      optimal_session_minutes: result.rows[0].optimal_session_minutes ?? 0
+      optimal_session_minutes: value ?? 0,
+      insight: value
+        ? `You perform best in ~${value} minute sessions for ${subject}.`
+        : "Not enough data for this subject yet"
     });
 
   } catch (err) {
@@ -101,9 +108,9 @@ export const getSubjectPerformance = async (req, res) => {
     const cleaned = result.rows.map(r => ({
       subject: r.subject,
       sessions: Number(r.sessions),
-      avg_focus: Number(r.avg_focus).toFixed(2),
-      avg_fatigue: Number(r.avg_fatigue).toFixed(2),
-      avg_duration_minutes: Number(r.avg_duration_minutes)
+      avg_focus: Number(r.avg_focus || 0).toFixed(2),
+      avg_fatigue: Number(r.avg_fatigue || 0).toFixed(2),
+      avg_duration_minutes: Number(r.avg_duration_minutes || 0)
     }));
 
     res.json(cleaned);
@@ -128,10 +135,13 @@ export const getStudyPlan = async (req, res) => {
       AND (end_time - start_time) < INTERVAL '5 hours'
     `);
 
-    const recommended = result.rows[0].recommended_minutes;
+    const recommended = result.rows[0]?.recommended_minutes;
 
     res.json({
-      recommended_session_minutes: recommended ?? 45
+      recommended_session_minutes: recommended ?? 45,
+      insight: recommended
+        ? `Your ideal session length is around ${recommended} minutes.`
+        : "Start with 45-minute sessions and adjust based on focus."
     });
 
   } catch (err) {
@@ -176,7 +186,7 @@ export const getBurnoutRisk = async (req, res) => {
       sessions.reduce((sum, s) => sum + (s.focus_rating || 0), 0) /
       sessions.length;
 
-    const fatigueValues = sessions.map(s => Number(s.fatigue_rating));
+    const fatigueValues = sessions.map(s => Number(s.fatigue_rating || 0));
     const fatigueTrend =
       fatigueValues[fatigueValues.length - 1] - fatigueValues[0];
 
@@ -185,10 +195,10 @@ export const getBurnoutRisk = async (req, res) => {
 
     if (avgDuration > 90 && avgFatigue >= 3 && avgFocus <= 3 && fatigueTrend > 0) {
       burnoutRisk = "HIGH";
-      recommendation = "Fatigue is increasing. Take a break immediately.";
+      recommendation = "Your fatigue is rising while focus drops. Pause now before burnout hits.";
     } else if (avgDuration > 60 && avgFatigue >= 3 && fatigueTrend >= 0) {
       burnoutRisk = "MEDIUM";
-      recommendation = "Fatigue is building up. Consider shorter sessions.";
+      recommendation = "You're starting to feel strain. Consider shorter sessions and breaks.";
     }
 
     res.json({
@@ -214,8 +224,7 @@ export const getBreakRecommendation = async (req, res) => {
     const result = await pool.query(`
       SELECT
         EXTRACT(EPOCH FROM (end_time - start_time)) / 60 AS duration_minutes,
-        fatigue_rating,
-        focus_rating
+        fatigue_rating
       FROM study_sessions
       WHERE end_time IS NOT NULL
       ORDER BY start_time DESC
@@ -241,11 +250,11 @@ export const getBreakRecommendation = async (req, res) => {
     let recommendation;
 
     if (avgDuration > 90 || avgFatigue >= 4) {
-      recommendation = "Take a 30 min break now. Go touch some grass 🌿";
+      recommendation = "You've been pushing hard. Take a 30-minute reset.";
     } else if (avgDuration > 60 || avgFatigue >= 3) {
-      recommendation = "Take a 10–15 min break. Breathe. Stretch. Hydrate.";
+      recommendation = "Take a short 10–15 minute break to stay sharp.";
     } else {
-      recommendation = "You're good. Keep going!";
+      recommendation = "You're in a good flow. Keep going.";
     }
 
     res.json({
@@ -283,7 +292,7 @@ export const predictSessionDuration = async (req, res) => {
       return res.json({
         subject,
         predicted_duration: 45,
-        reason: "No past data, using default"
+        insight: "No past data. Starting with a balanced default."
       });
     }
 
@@ -299,10 +308,21 @@ export const predictSessionDuration = async (req, res) => {
 
     const cappedDuration = Math.min(avgDuration, 120);
 
+    let insight;
+
+    if (cappedDuration <= 45) {
+      insight = "You work best in short, focused bursts.";
+    } else if (cappedDuration <= 90) {
+      insight = "You maintain strong focus in medium-length sessions.";
+    } else {
+      insight = "You can go long, but watch fatigue levels.";
+    }
+
     res.json({
       subject,
       predicted_duration: Number(cappedDuration.toFixed(0)),
-      based_on_sessions: baseSessions.length
+      based_on_sessions: baseSessions.length,
+      insight
     });
 
   } catch (err) {
@@ -323,7 +343,6 @@ export const getBestStudyTime = async (req, res) => {
         COUNT(*) as sessions
       FROM study_sessions
       WHERE end_time IS NOT NULL
-     
       GROUP BY EXTRACT(HOUR FROM start_time)
       ORDER BY avg_focus DESC, avg_fatigue ASC
       LIMIT 1
@@ -338,12 +357,22 @@ export const getBestStudyTime = async (req, res) => {
 
     const best = result.rows[0];
 
+    let insight;
+
+    if (best.avg_focus >= 4.5 && best.avg_fatigue <= 2.5) {
+      insight = `Peak performance around ${best.hour}:00. Use this time for hardest tasks.`;
+    } else if (best.avg_focus >= 4) {
+      insight = `Good focus around ${best.hour}:00. Ideal for important study.`;
+    } else {
+      insight = `You study at ${best.hour}:00, but performance can improve.`;
+    }
+
     res.json({
       best_hour: `${best.hour}:00`,
       avg_focus: Number(best.avg_focus).toFixed(2),
       avg_fatigue: Number(best.avg_fatigue).toFixed(2),
       sessions_analyzed: Number(best.sessions),
-      insight: "This is when your brain performs best"
+      insight
     });
 
   } catch (err) {
