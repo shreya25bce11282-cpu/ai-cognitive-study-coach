@@ -182,6 +182,7 @@ const fatigueTrend =
       avg_duration_minutes: avgDuration.toFixed(2),
       avg_fatigue: avgFatigue.toFixed(2),
       avg_focus: avgFocus.toFixed(2),
+      fatigue_trend: fatigueTrend,
       burnout_risk: burnoutRisk,
       recommendation
     });
